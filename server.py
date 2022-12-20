@@ -1,43 +1,10 @@
 from flask import Flask, jsonify, session
 from flask_cors import CORS, cross_origin
+from collections import OrderedDict
+import datetime
 import sqlite3
 import time
 import json
-import pytz
-import datetime
-
-def get_time_zone(country_code):
-    # Get a list of all time zones
-    time_zones = pytz.all_timezones
-    # Iterate through the list of time zones
-    for time_zone in time_zones:
-        # Split the time zone into its components (e.g. "Europe/Paris" -> ("Europe", "Paris"))
-        tz_components = time_zone.split('/')
-        # If the first component (the continent) matches the country code, return the time zone
-        if tz_components[0] == country_code:
-            return time_zone
-    # If no matching time zone was found, return None
-    return None
-
-def get_dates_of_week():
-    # Get the current date
-    now = datetime.datetime.now()
-
-    # Set the day of the week to Monday (0)
-    now = now - datetime.timedelta(days=now.weekday())
-
-    # Initialize a list to hold the dates
-    dates = []
-
-    # Iterate through the days of the week
-    for i in range(7):
-        # Append the date to the list
-        dates.append(now.date())
-        # Increment the date by one day
-        now += datetime.timedelta(days=1)
-
-    # Return the list of dates
-    return dates
 
 # create database if it doesn't exist
 conn = sqlite3.connect('db/days.db')
@@ -46,8 +13,18 @@ conn.commit()
 conn.close()
 
 
+def get_week_dates(date):
+    week = OrderedDict()
+    date = datetime.datetime.strptime(date, '%d.%m.%Y')
+    for i in range(7):
+        day = date + datetime.timedelta(days=i)
+        week[i] = {"name": day.strftime(
+            "%A"), "date": day.strftime("%d.%m.%Y")}
+    return week
+
+
 def date_to_weekday(date):
-    return time.strftime('%A', time.strptime(date,  '%d.%m.%Y'))
+    return time.strftime('%A', time.strptime(date, '%d.%m.%Y'))
 
 
 DEBUG = True
@@ -61,35 +38,65 @@ app.config['CORS_HEADERS'] = 'Access-Control-Allow-Origin'
 def ping():
     return jsonify('pong!')
 
-@app.route('/today')
-@cross_origin()
-def get_today():
-    return jsonify({
-        "date": time.strftime('%d.%m.%Y'),
-        "datetime": time.time(),
-        "days": json.dumps(get_dates_of_week()),
-        "weekday": time.strftime('%A'),
-        "week": time.strftime('%W'),
-        "month": time.strftime('%B'),
-        "year": time.strftime('%Y'),
-        "timezone": time.strftime('%Z')
-        })
 
-@app.route('/goto/date/<date>')
+@app.route('/goto/today')
 @cross_origin()
-def get_date(date):
-    return jsonify({"date": date, "weekday": date_to_weekday(date), "week": time.strftime('%W', time.strptime(date, '%d.%m.%Y')), "month": time.strftime('%B', time.strptime(date, '%d.%m.%Y')), "year": time.strftime('%Y', time.strptime(date, '%d.%m.%Y'))})
+def goto_today():
+    week = get_week_dates(time.strftime('%d.%m.%Y'))
+    return jsonify(
+        {
+            "day": time.strftime('%A'),
+            "week": time.strftime('%W'),
+            "date": time.strftime('%d.%m.%Y'),
+            "weekNum": time.strftime('%W'),
+            "week": week
+        }
+    )
 
-@app.route('/goto/day/<day>/<date>')
+
+@app.route('/goto/<date>')
 @cross_origin()
-def get_day(day, date):
-    return jsonify({"date": time.strftime('%d.%m.%Y', time.strptime(date, '%d.%m.%Y') + time.timedelta(days=int(day))), "weekday": date_to_weekday(time.strftime('%d.%m.%Y', time.strptime(date, '%d.%m.%Y') + time.timedelta(days=int(day)))), "week": time.strftime('%W', time.strptime(date, '%d.%m.%Y') + time.timedelta(days=int(day))), "month": time.strftime('%B', time.strptime(date, '%d.%m.%Y') + time.timedelta(days=int(day))), "year": time.strftime('%Y', time.strptime(date, '%d.%m.%Y') + time.timedelta(days=int(day)))})
+def goto_date(date):
+    return jsonify(
+        {
+            "day": time.strftime('%A', time.localtime(time.mktime(time.strptime(date, '%d.%m.%Y')))),
+            "week": time.strftime('%W', time.localtime(time.mktime(time.strptime(date, '%d.%m.%Y')))),
+            "date": time.strftime('%d.%m.%Y', time.localtime(time.mktime(time.strptime(date, '%d.%m.%Y')))),
+            "weekNum": time.strftime('%W', time.localtime(time.mktime(time.strptime(date, '%d.%m.%Y')))),
+            "week": get_week_dates(time.strftime('%d.%m.%Y', time.localtime(time.mktime(time.strptime(date, '%d.%m.%Y')))))
+        }
+    )
 
-@app.route('/goto/week/<week>')
+
+@app.route('/events/<date>')
 @cross_origin()
-def get_week(week):
-    return jsonify({"date": time.strftime('%d.%m.%Y', time.strptime(week, '%W')), "weekday": date_to_weekday(time.strftime('%d.%m.%Y', time.strptime(week, '%W'))), "week": week, "month": time.strftime('%B', time.strptime(week, '%W')), "year": time.strftime('%Y', time.strptime(week, '%W'))})
+def get_events(date):
+    conn = sqlite3.connect('db/days.db')
+    c = conn.cursor()
+    c.execute('SELECT * FROM events WHERE event_start <= ? AND event_end >= ?',
+              (time.mktime(time.strptime(date, '%d.%m.%Y')), time.mktime(time.strptime(date, '%d.%m.%Y'))))
+    events = c.fetchall()
+    conn.close()
+    return jsonify(events)
 
-    
+
+@app.route('/events/add/<title>/<description>/<start>/<end>')
+@cross_origin()
+def add_event(title, description, start, end):
+    # convert YYYY-MM-DD to DD.MM.YYYY
+    start = time.strftime('%d.%m.%Y', time.localtime(
+        time.mktime(time.strptime(start, '%Y-%m-%d'))))
+    end = time.strftime('%d.%m.%Y', time.localtime(
+        time.mktime(time.strptime(end, '%Y-%m-%d'))))
+    conn = sqlite3.connect('db/days.db')
+    c = conn.cursor()
+    colour = ""
+    c.execute('INSERT INTO events (event_title, event_description, event_start, event_end, event_colour) VALUES (?, ?, ?, ?, ?)',
+              (title, description, start, end, colour))
+    conn.commit()
+    conn.close()
+    return jsonify(True)
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5174)
