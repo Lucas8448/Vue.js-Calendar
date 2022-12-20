@@ -1,2 +1,72 @@
 @import './base.css';
 
+.weekTitle {
+    grid-area: weekTitle;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+.currentDate {
+    grid-area: currentDate;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.days {
+    grid-area: days;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-gap: 0.5em;
+    padding: 0.5em;
+}
+
+.countries {
+    grid-area: countries;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-gap: 0.5em;
+    padding: 0.5em;
+}
+
+.nav {
+    display: grid;
+    text-align: center;
+    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas: "countries weekTitle currentDate"
+                                            "days days days"; 
+}
+
+select {
+    appearance: none;
+    background-color: #181818;
+    color: rgb(241, 241, 241);
+    font-size: 16px;
+    font-family: sans-serif;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+}
+
+select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px #aaa;
+}
+
+input[type="radio"] {
+    display: none;
+}
+
+input[type="radio"] + label {
+    display: inline-block;
+    padding: 0.5em 1em;
+    margin: 0 0.5em 0.5em 0;
+    border: 1px solid #ccc;
+    border-radius: 0.25em;
+    cursor: pointer;
+}

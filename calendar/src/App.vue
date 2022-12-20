@@ -3,78 +3,77 @@ import { RouterLink, RouterView } from 'vue-router'
 </script>
 
 <template>
-  <h1>Calendar</h1>
-  <template v-for="day in days" class="nav">
-    <input type="radio" :id="day" :value="day" name="day" v-model="CurrentDay">
+  <div class="nav">
+  <div class="weekTitle">
+
+    <h1>Week {{ CurrentWeek }}</h1>
+  </div>
+
+<h2 class="currentDate">{{ CurrentDate }}</h2>
+<div class="days">
+  <template v-for="day in days">
+    <input type="radio" :id="day" :value="day" name="day" v-model="CurrentDay" @click="GetDay()">
     <label :for="day">{{ day }}</label>
   </template>
-  <h3>{{ CurrentDay }}</h3>
-  <ul>
-
-  </ul>
+</div>
+    <!--A dropdown with all countries where CurrentCountries gets updated with the selected value-->
+<div class="countries">
+  <select v-model="CurrentCountry">
+        <option v-for="country in countries" :key="country" :value="country">{{ country.name }}</option>
+  </select>
+</div>
+</div>
 </template>
 
-<style>
-.nav {
-  display: inline-block;
-  margin-right: 1em;
-  text-align: center;
-  align-items: center;
-}
-
-input[type="radio"] {
-  display: none;
-}
-
-input[type="radio"] + label {
-  display: inline-block;
-  padding: 0.5em 1em;
-  margin: 0 0.5em 0.5em 0;
-  border: 1px solid #ccc;
-  border-radius: 0.25em;
-  cursor: pointer;
-}
-</style>
-
 <script>
-const API_URL = `http://localhost:5000/`
+import countriesList from 'countries-list';
+
+const API_URL = `http://localhost:5174/`
 
 export default {
   data: () => ({
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-    weeks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52],
+    countries: Object.values(countriesList.countries),
+    days: "",
+    weeks: Array.from({ length: 52 }, (_, i) => i + 1),
     CurrentDay: "",
     CurrentWeek: "",
-    Date: "",
+    CurrentDate: "",
+    CurrentCountry: countriesList.countries["NO"],
     commits: null
   }),
 
   created() {
     // fetch on init
-    this.UpdateCurrentDay(),
-    this.UpdateCurrentWeek(),
-    this.GetDay()
+    this.GetToday()
   },
   methods: {
-    async UpdateCurrentDay() {
-      this.resp = await (await (await fetch(`${API_URL}get/day`)).json())
-      this.CurrentDay = this.resp
-      console.log(this.CurrentDay)
+    async GetToday() {
+      this.resp = await (await (await fetch(`${API_URL}today`)).json())
+      this.CurrentDate = this.resp.date,
+        this.days = this.resp.days,
+        this.CurrentDay = this.resp.weekday,
+      this.CurrentWeek = this.resp.week
     },
-    async UpdateCurrentWeek() {
-      this.resp = await (await (await fetch(`${API_URL}get/week`)).json())
-      this.CurrentWeek = this.resp
-      console.log(this.CurrentWeek)
+    async GetDate() { 
+      this.resp = await (await (await fetch(`${API_URL}goto/date/${this.CurrentDate}`)).json())
+      this.day_data = this.resp
+      this.CurrentDay = this.day_data.weekday
+      this.CurrentWeek = this.day_data.week
+      this.CurrentDate = this.day_data.date
+    },
+    async GetWeek() {
+      this.resp = await (await (await fetch(`${API_URL}goto/week/${this.CurrentWeek}`)).json())
+      this.day_data = this.resp
+      this.CurrentDay = this.day_data.weekday
+      this.CurrentWeek = this.day_data.week
+      this.CurrentDate = this.day_data.date
     },
     async GetDay() {
-      if (typeof this.CurrentWeek !== "undefined" || typeof this.CurrentDay !== "undefined") {
-        this.resp = await (await (await fetch(`${API_URL}day/${this.CurrentWeek}/${this.CurrentDay}`)).json())
-        this.date = this.resp
-        console.log(this.date)
-      }
-      else {
-        setTimeout(this.GetDay(), 20);
-      }
+      this.resp = await (await (await fetch(`${API_URL}goto/day/${this.CurrentDay}/${this.CurrentDate}`)).json())
+      this.day_data = this.resp
+      this.CurrentDay = this.day_data.weekday
+      this.CurrentWeek = this.day_data.week
+      this.CurrentDate = this.day_data.date
     }
   }
 }
